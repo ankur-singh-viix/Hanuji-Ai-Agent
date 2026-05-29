@@ -1,0 +1,65 @@
+{
+  "name": "Hanu Ji — Telegram to Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json;\nconst chatId = msg.message?.chat?.id;\nconst text = msg.message?.text;\nconst userId = `tg_${msg.message?.from?.id}`;\nconst name = `${msg.message?.from?.first_name || ''} ${msg.message?.from?.last_name || ''}`.trim();\n\nif (!text || !chatId) return [];\n\nreturn [{ json: { chatId, text, userId, name } }];"
+      },
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "userId",  "value": "={{ $json.userId }}" },
+            { "name": "channel", "value": "telegram" },
+            { "name": "message", "value": "={{ $json.text }}" }
+          ]
+        }
+      },
+      "name": "Call AI Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Message').item.json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "name": "Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [900, 300],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger":  { "main": [[{ "node": "Extract Message", "type": "main", "index": 0 }]] },
+    "Extract Message":   { "main": [[{ "node": "Call AI Agent",   "type": "main", "index": 0 }]] },
+    "Call AI Agent":     { "main": [[{ "node": "Telegram Reply",  "type": "main", "index": 0 }]] }
+  }
+}

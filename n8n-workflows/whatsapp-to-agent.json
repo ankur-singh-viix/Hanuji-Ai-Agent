@@ -1,0 +1,93 @@
+{
+  "name": "Hanu Ji — WhatsApp to Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Return 200 Immediately",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst messages = body?.entry?.[0]?.changes?.[0]?.value?.messages;\nif (!messages || !messages[0] || messages[0].type !== 'text') return [];\nconst msg = messages[0];\nconst contacts = body.entry[0].changes[0].value.contacts;\nreturn [{ json: {\n  phone: msg.from,\n  text: msg.text.body,\n  userId: `wa_${msg.from}`,\n  name: contacts?.[0]?.profile?.name || msg.from\n}}];"
+      },
+      "name": "Extract WA Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "userId",  "value": "={{ $json.userId }}" },
+            { "name": "channel", "value": "whatsapp" },
+            { "name": "message", "value": "={{ $json.text }}" }
+          ]
+        }
+      },
+      "name": "Call AI Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{$env.WA_PHONE_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.WA_TOKEN}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to",   "value": "={{ $('Extract WA Message').item.json.phone }}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={\"body\": \"{{ $('Call AI Agent').item.json.reply }}\"}" }
+          ]
+        }
+      },
+      "name": "Send WA Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 380]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook":   { "main": [[
+      { "node": "Return 200 Immediately", "type": "main", "index": 0 },
+      { "node": "Extract WA Message",     "type": "main", "index": 0 }
+    ]]},
+    "Extract WA Message": { "main": [[{ "node": "Call AI Agent",  "type": "main", "index": 0 }]] },
+    "Call AI Agent":      { "main": [[{ "node": "Send WA Reply",  "type": "main", "index": 0 }]] }
+  }
+}

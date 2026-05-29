@@ -1,0 +1,104 @@
+### Hanu Ji API Tests
+### Install "REST Client" extension in VS Code to run these
+
+@base = http://localhost:3000
+@agent = http://localhost:3001
+@webhook = http://localhost:3002
+
+### ── Auth ─────────────────────────────────────────────────
+
+### Login / Register
+# @name login
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userId": "test_user_001",
+  "name": "Test User",
+  "channel": "web"
+}
+
+###
+
+@token = {{login.response.body.token}}
+
+### ── User ─────────────────────────────────────────────────
+
+### Get Profile
+GET {{base}}/api/users/profile
+Authorization: Bearer {{token}}
+
+### Update Profile
+PUT {{base}}/api/users/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Raj Sharma",
+  "timezone": "Asia/Kolkata",
+  "work_start": "09:00",
+  "work_end": "18:00"
+}
+
+### Get Conversations
+GET {{base}}/api/users/conversations?limit=20
+Authorization: Bearer {{token}}
+
+### ── Memory ────────────────────────────────────────────────
+
+### Get All Memories
+GET {{base}}/api/memory
+Authorization: Bearer {{token}}
+
+### ── Analytics ─────────────────────────────────────────────
+
+### Get Summary
+GET {{base}}/api/analytics/summary
+Authorization: Bearer {{token}}
+
+### Get Daily Stats
+GET {{base}}/api/analytics/daily
+Authorization: Bearer {{token}}
+
+### ── Agent Direct ───────────────────────────────────────────
+
+### Test Agent — General
+POST {{agent}}/process
+Content-Type: application/json
+
+{
+  "userId": "test_user_001",
+  "channel": "web",
+  "message": "Hello! What can you do?"
+}
+
+### Test Agent — Calendar Fetch
+POST {{agent}}/process
+Content-Type: application/json
+
+{
+  "userId": "test_user_001",
+  "channel": "web",
+  "message": "What's on my calendar today?"
+}
+
+### Test Agent — Create Event
+POST {{agent}}/process
+Content-Type: application/json
+
+{
+  "userId": "test_user_001",
+  "channel": "web",
+  "message": "Schedule a team standup tomorrow at 10am for 30 minutes"
+}
+
+### ── Health Checks ──────────────────────────────────────────
+
+### API Gateway Health
+GET {{base}}/health
+
+### Agent Service Health
+GET {{agent}}/health
+
+### Webhook Service Health
+GET {{webhook}}/health

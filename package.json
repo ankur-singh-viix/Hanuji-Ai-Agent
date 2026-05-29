@@ -1,0 +1,22 @@
+{
+  "name": "hanu-ji",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal AI Agent - Telegram + WhatsApp + Google Calendar",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix services/api-gateway && npm install --prefix services/agent-service && npm install --prefix services/webhook-service && npm install --prefix frontend",
+    "dev": "concurrently \"npm run dev --prefix services/api-gateway\" \"npm run dev --prefix services/agent-service\" \"npm run dev --prefix services/webhook-service\" \"npm run dev --prefix frontend\"",
+    "build": "npm run build --prefix services/api-gateway && npm run build --prefix services/agent-service && npm run build --prefix services/webhook-service && npm run build --prefix frontend",
+    "db:migrate": "node database/migrations/run.js",
+    "db:seed": "node database/seeds/run.js",
+    "infra:up": "docker compose -f docker-compose.dev.yml up -d",
+    "infra:down": "docker compose -f docker-compose.dev.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "pg": "^8.18.0"
+  }
+}

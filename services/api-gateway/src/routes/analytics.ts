@@ -14,12 +14,17 @@ router.get('/summary', async (req: AuthRequest, res) => {
         [req.user?.userId]
       ),
       db.query(
-        `SELECT tool_used, COUNT(*) as count
+        `SELECT tool_used,
+                COUNT(*) AS total
          FROM conversation_logs
-         WHERE user_id=$1 AND tool_used IS NOT NULL
-         GROUP BY tool_used ORDER BY count DESC LIMIT 10`,
+         WHERE user_id=$1
+           AND tool_used IS NOT NULL
+         GROUP BY tool_used
+         ORDER BY total DESC
+         LIMIT 5;`,
         [req.user?.userId]
       ),
+
       db.query(
         `SELECT COUNT(*) as total FROM memory_facts WHERE user_id=$1`,
         [req.user?.userId]

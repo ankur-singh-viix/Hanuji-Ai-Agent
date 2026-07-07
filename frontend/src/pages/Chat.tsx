@@ -15,17 +15,15 @@ interface Message {
 }
 
 export default function Chat() {
-  const { profile } = useStore();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: `Namaste! I'm Hanu Ji, your personal AI assistant 🐒\n\nI can help you:\n• Schedule and manage calendar events\n• Answer questions\n• Remember important things about you\n\nTry saying: _"What's on my calendar today?"_ or _"Schedule a meeting tomorrow at 3pm"_`,
-      timestamp: new Date(),
-    },
-  ]);
+  const {
+    profile,
+    messages,
+    setMessages,
+    isTyping,
+    setIsTyping,
+  } = useStore();
   const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  // const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,7 +67,7 @@ export default function Chat() {
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: res.data.reply 
+        content: res.data.reply
           || 'Sorry, I had trouble generating a response. Please try again.',
         timestamp: new Date(),
         toolUsed: res.data.toolUsed,

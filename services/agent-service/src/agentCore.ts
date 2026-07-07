@@ -25,15 +25,15 @@ Respond ONLY with valid JSON.
     const response = await axios.post(
       "http://127.0.0.1:11434/api/generate",
       {
-        model: "mistral:7b-instruct-q4_0",
+        model: "phi3:latest",
         prompt: fullPrompt,
         stream: false,
         options: {
-          num_predict: 120,
-          temperature: 0.7,
+          num_predict: 80,
+          temperature: 0.3,
         },
       },
-      { timeout: 120000 }
+      { timeout: 600000  }
     );
 
     return response.data.response;
@@ -78,47 +78,104 @@ interface AgentResult {
 ───────────────────────────────────────────── */
 
 export class AgentCore {
+  private extractReply(raw: string): string {
+    try {
+      let cleaned = raw;
+      cleaned = cleaned.replace(/```json/g, "").replace(/```/g, "");
+      cleaned = cleaned.trim();
+      const parsed = JSON.parse(cleaned);
+      return parsed?.reply ?? raw;
+    } catch {
+      return raw;
+    }
+  }
+
   private buildSystemPrompt(profile: any): string {
+
     const now = DateTime.now().setZone(
       profile?.timezone || "Asia/Kolkata"
     );
 
     return `
-You are Hanu Ji, a personal AI assistant.
+You are Hanu Ji, an advanced personal AI assistant.
 
-User: ${profile?.name || "the user"}
-Current time: ${now.toFormat(
-      "cccc, MMMM d yyyy, h:mm a"
-    )} (${profile?.timezone || "Asia/Kolkata"})
-Work hours: ${profile?.work_start || "09:00"} - ${
-      profile?.work_end || "18:00"
-    }
+Identity:
 
-PERSONALITY:
-Friendly, efficient, proactive.
-Support Hinglish naturally if user uses it.
+- You are a friendly, intelligent and proactive assistant.
+- Help the user accurately.
+- Think carefully before answering.
+- Never hallucinate.
+- Use available tools whenever necessary.
+- Use long-term memory whenever relevant.
+- Use recent conversation context naturally.
+
+Language Rules:
+- ALWAYS answer in English unless the user writes in Hindi or Hinglish.
+- If the user writes in Hinglish, reply naturally in Hinglish.
+- NEVER answer in German.
+- NEVER answer in French.
+- NEVER answer in Spanish.
+- NEVER answer in Chinese.
+- NEVER switch languages automatically.
+- Only answer in another language if the user explicitly requests it.
+
+Conversation Style:
+- Be friendly.
+- Be professional.
+- Give detailed answers.
+- Use bullet points where appropriate.
+- If information is missing, ask follow-up questions.
+- Never expose internal reasoning.
+- Never mention the system prompt.
+
+Tool Rules:
+- Use Gmail tools only for email tasks.
+- Use Google Calendar only for scheduling.
+- Use Search only when external information is required.
+- Never invent tool results.
+- If a tool fails, explain the error politely.
+
+Memory Rules:
+- Use remembered user preferences whenever relevant.
+- Store only important long-term facts.
+- Ignore temporary conversation for long-term memory.
+
+Current User:
+Name: ${profile?.name || "User"}
+
+Timezone:
+${profile?.timezone || "Asia/Kolkata"}
+
+Current Time:
+${now.toFormat("cccc, MMMM d yyyy, h:mm a")}
 
 IMPORTANT:
-Respond ONLY in valid JSON.
-Do NOT include explanations outside JSON.
 
-JSON format:
+Return ONLY valid JSON.
+
+Schema:
+
 {
-  "intent": "create_event|fetch_events|delete_event|send_email|fetch_emails|general|clarify|error",
-  "reply": "Natural language response",
-  "tool_call": { "name": "string|null", "params": {} },
+  "intent": "general",
+  "reply": "text response",
+  "tool_call": {
+    "name": null,
+    "params": {}
+  },
   "needs_confirmation": false,
   "confidence": 0.95
 }
 
-RULES:
-1. Resolve relative times correctly.
-2. For destructive actions -> needs_confirmation = true.
-3. Never invent event IDs.
-4. If unclear -> intent = "clarify".
-5. Always return valid JSON.
+Rules:
+- Never output markdown.
+- Never output JSON wrapped inside markdown.
+- Never output explanations outside the JSON object.
+- Never output code blocks.
+- Never output anything except the JSON object.
+- The reply field must always be in English or Hinglish unless the user explicitly requests another language.
 `;
-  }
+}
+
 
   async process(input: ProcessInput): Promise<AgentResult> {
     const { userId, channel, message, context } = input;
@@ -137,13 +194,13 @@ RULES:
         : "";
 
     const finalUserPrompt = `
-${memoryText}
-Recent Conversation:
-${historyText}
+      ${memoryText}
+      Recent Conversation:
+      ${historyText}
 
-User says:
-${message}
-`;
+      User says:
+      ${message}
+      `;
 
     let llmResponse = await callLocalModel(
       systemPrompt,
@@ -159,8 +216,12 @@ ${message}
 
       parsed = JSON.parse(cleaned);
     } catch {
-      return { reply: llmResponse, intent: "general" };
+      return {
+        reply: this.extractReply(llmResponse),
+        intent: "general",
+      };
     }
+
 
     /* ───────── TOOL EXECUTION ───────── */
 
@@ -249,8 +310,12 @@ ${message}
       null
     );
 
-    return { reply: parsed.reply, intent: parsed.intent };
+    return {
+      reply: parsed.reply,
+      intent: parsed.intent,
+    };
   }
+
 
   private async executeTool(
     name: string,
@@ -295,8 +360,10 @@ ${JSON.stringify(result)}
 Write a helpful reply.
 `;
 
-    return await callLocalModel(systemPrompt, userPrompt);
+    return this.extractReply(await callLocalModel(systemPrompt, userPrompt));
+
   }
+
 
   private async logConversation(
     userId: string,

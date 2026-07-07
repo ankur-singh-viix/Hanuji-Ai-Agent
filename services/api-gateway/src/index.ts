@@ -61,24 +61,69 @@ app.use('/api/memory', authenticate, memoryRoutes);
 app.use('/api/analytics', authenticate, analyticsRoutes);
 
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', authenticate, async (req, res) => {
   try {
     const { message } = req.body;
+    const userId = (req as any).user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
 
     if (!message) {
       return res.status(400).json({ error: 'Message required' });
     }
 
+
     const agentResponse = await axios.post(
       'http://127.0.0.1:3001/process',
       {
-        userId: 'web-user',
+        userId,
         channel: 'web',
         message,
 
       },
        { timeout: 180000 }
     );
+
+    
+  // Save conversation
+await db.query(
+  `INSERT INTO conversation_logs
+(user_id, channel, role, content, intent, tool_used, latency_ms)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+`,
+[
+  userId,
+  'web',
+  'user',
+  message,
+  agentResponse.data.intent,
+  agentResponse.data.toolUsed || null,
+  agentResponse.data.latency || 0
+]
+);
+
+
+await db.query(
+  `INSERT INTO conversation_logs
+(user_id, channel, role, content, intent, tool_used, latency_ms)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+`,
+[
+  userId,
+  'web',
+  'assistant',
+  agentResponse.data.reply,
+  agentResponse.data.intent,
+  agentResponse.data.toolUsed || null,
+  agentResponse.data.latency || 0
+]
+);
+
+
 
     return res.json(agentResponse.data);
 

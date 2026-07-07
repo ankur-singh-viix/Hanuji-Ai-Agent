@@ -104,6 +104,7 @@ export class MemoryManager {
     // 🔹 Long-term fact extraction (non-blocking)
     if (userMsg.length < 25) return;
 
+
 // Skip fact extraction for general queries
     const lower = userMsg.toLowerCase();
     if (
@@ -115,7 +116,17 @@ export class MemoryManager {
     ) {
       return;
     }
+
+    try {
+      await this.extractAndStoreFacts(userId, userMsg);
+    } catch (err: any) {
+      logger.warn('Fact extraction failed', {
+        err: err.message
+      });
+    }
   }
+
+
 
   private async extractAndStoreFacts(userId: string, message: string) {
     if (message.length < 20) return;

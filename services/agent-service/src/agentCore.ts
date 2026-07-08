@@ -29,7 +29,7 @@ Respond ONLY with valid JSON.
         prompt: fullPrompt,
         stream: false,
         options: {
-          num_predict: 80,
+          num_predict: 400,
           temperature: 0.3,
         },
       },
@@ -78,13 +78,25 @@ interface AgentResult {
 ───────────────────────────────────────────── */
 
 export class AgentCore {
+  private stripJsonComments(raw: string): string {
+    // phi3 occasionally appends "// explanation" after a JSON value.
+    // Strip anything from // to end of line so JSON.parse doesn't choke on it.
+    return raw.replace(/\/\/.*$/gm, '');
+  }
+
   private extractReply(raw: string): string {
     try {
       let cleaned = raw;
       cleaned = cleaned.replace(/```json/g, "").replace(/```/g, "");
+      cleaned = this.stripJsonComments(cleaned);
       cleaned = cleaned.trim();
       const parsed = JSON.parse(cleaned);
-      return parsed?.reply ?? raw;
+      return (
+        parsed?.reply ??
+        parsed?.response?.message ??
+        parsed?.message ??
+        raw
+      );
     } catch {
       return raw;
     }
@@ -135,6 +147,13 @@ Tool Rules:
 - Never invent tool results.
 - If a tool fails, explain the error politely.
 
+Task Rules:
+- Use the create_task tool whenever the user asks to create, add, or remember a task/todo (e.g. "tomorrow finish frontend", "remind me to call mom").
+- Resolve relative dates like "today", "tomorrow", "next week" using the Current Time below and the user's timezone, and pass an ISO 8601 datetime as due_at.
+- Use list_tasks when the user asks what tasks or todos they have.
+- Use complete_task when the user says a task is done or finished.
+- Do not set needs_confirmation for simple, unambiguous task creation; only ask for confirmation if the task details are unclear.
+
 Memory Rules:
 - Use remembered user preferences whenever relevant.
 - Store only important long-term facts.
@@ -171,11 +190,70 @@ Rules:
 - Never output JSON wrapped inside markdown.
 - Never output explanations outside the JSON object.
 - Never output code blocks.
+- Never output comments inside the JSON (no // or /* */).
 - Never output anything except the JSON object.
 - The reply field must always be in English or Hinglish unless the user explicitly requests another language.
 `;
 }
 
+
+  private parseAgentResponse(rawResponse: string): {
+    intent: string;
+    reply: string;
+    tool_call: { name: string | null; params: any };
+    needs_confirmation: boolean;
+  } {
+    const cleaned = this.stripJsonComments(
+      rawResponse.replace(/```json|```/g, '')
+    ).trim();
+
+    // 1) Try strict JSON parsing first (the common, well-formed case)
+    try {
+      const parsed = JSON.parse(cleaned);
+      return {
+        intent: parsed.intent || 'general',
+        reply: parsed.reply ?? parsed.response?.message ?? parsed.message ?? '',
+        tool_call: {
+          name: parsed.tool_call?.name ?? null,
+          params: parsed.tool_call?.params ?? {},
+        },
+        needs_confirmation: !!parsed.needs_confirmation,
+      };
+    } catch {
+      // fall through to tolerant regex extraction below
+    }
+
+    // 2) Regex-based field extraction — tolerant of malformed JSON
+    //    (invalid numbers, stray comments, unexpected nesting, etc.)
+    const intentMatch = cleaned.match(/"intent"\s*:\s*"([^"]*)"/);
+    const replyMatch =
+      cleaned.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)"/) ||
+      cleaned.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    const toolNameMatch = cleaned.match(/"tool_call"\s*:\s*\{\s*"name"\s*:\s*"([^"]+)"/);
+    const needsConfirmationMatch = cleaned.match(/"needs_confirmation"\s*:\s*(true|false)/);
+
+    let params: any = {};
+    const paramsMatch = cleaned.match(/"params"\s*:\s*(\{[^}]*\})/);
+    if (paramsMatch) {
+      try {
+        params = JSON.parse(this.stripJsonComments(paramsMatch[1]));
+      } catch {
+        params = {};
+      }
+    }
+
+    return {
+      intent: intentMatch?.[1] || 'general',
+      reply: replyMatch
+        ? replyMatch[1].replace(/\\"/g, '"')
+        : "I understood that, but had trouble formatting my response. Could you rephrase?",
+      tool_call: {
+        name: toolNameMatch?.[1] || null,
+        params,
+      },
+      needs_confirmation: needsConfirmationMatch?.[1] === 'true',
+    };
+  }
 
   async process(input: ProcessInput): Promise<AgentResult> {
     const { userId, channel, message, context } = input;
@@ -207,20 +285,7 @@ Rules:
       finalUserPrompt
     );
 
-    let parsed: any;
-
-    try {
-      const cleaned = llmResponse
-        .replace(/```json|```/g, "")
-        .trim();
-
-      parsed = JSON.parse(cleaned);
-    } catch {
-      return {
-        reply: this.extractReply(llmResponse),
-        intent: "general",
-      };
-    }
+    const parsed = this.parseAgentResponse(llmResponse);
 
 
     /* ───────── TOOL EXECUTION ───────── */
@@ -338,32 +403,46 @@ Rules:
     }
   }
 
-  private async formatToolResult(
+  private buildFallbackReply(toolName: string, result: any): string {
+    switch (toolName) {
+      case 'create_task': {
+        const due = result?.due_at
+          ? ` (due ${new Date(result.due_at).toLocaleString()})`
+          : '';
+        return `✅ Task created: "${result?.title}"${due}.`;
+      }
+      case 'complete_task':
+        return `✅ Marked "${result?.title}" as completed.`;
+      case 'list_tasks': {
+        const tasks = result?.tasks || [];
+        return tasks.length
+          ? `You have ${tasks.length} pending task(s): ${tasks.map((t: any) => t.title).join(', ')}.`
+          : 'You have no pending tasks right now.';
+      }
+      case 'create_calendar_event':
+        return `✅ Event "${result?.title}" scheduled.`;
+      case 'fetch_calendar_events':
+        return result?.count
+          ? `You have ${result.count} upcoming event(s).`
+          : 'No upcoming events found.';
+      case 'delete_calendar_event':
+        return `✅ Event removed from your calendar.`;
+      default:
+        return `✅ Done.`;
+    }
+  }
+
+private async formatToolResult(
     originalMessage: string,
     toolName: string,
     result: any,
     profile: any
   ): Promise<string> {
-    const systemPrompt = `
-You are Hanu Ji.
-Format tool results as friendly, concise replies (1-3 sentences).
-Current time: ${DateTime.now()
-      .setZone(profile?.timezone || "Asia/Kolkata")
-      .toFormat("h:mm a")}
-`;
-
-    const userPrompt = `
-User asked: "${originalMessage}"
-Tool "${toolName}" returned:
-${JSON.stringify(result)}
-
-Write a helpful reply.
-`;
-
-    return this.extractReply(await callLocalModel(systemPrompt, userPrompt));
-
+    // Skip the extra LLM round-trip for tool replies — it's slow on a local
+    // model and was causing gateway timeouts even after the tool succeeded.
+    // buildFallbackReply() already gives a clean, instant, accurate reply.
+    return this.buildFallbackReply(toolName, result);
   }
-
 
   private async logConversation(
     userId: string,

@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-  timeout: 180000,
+  timeout: 300000,
 });
 
 api.interceptors.request.use((config) => {
@@ -43,6 +43,11 @@ export const memoryApi = {
 export const analyticsApi = {
   getSummary: () => api.get('/api/analytics/summary'),
   getDaily: () => api.get('/api/analytics/daily'),
+};
+
+export const tasksApi = {
+  getPending: () => api.get('/api/tasks?status=pending'),
+  complete: (id: string) => api.patch(`/api/tasks/${id}/complete`),
 };
 
 export default api;

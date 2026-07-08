@@ -18,6 +18,7 @@ import userRoutes from './routes/users';
 import memoryRoutes from './routes/memory';
 import analyticsRoutes from './routes/analytics';
 import { authenticate } from './middleware/auth';
+import taskRoutes from './routes/tasks';
 
 const app = express();
 const server = createServer(app);
@@ -59,6 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticate, userRoutes);
 app.use('/api/memory', authenticate, memoryRoutes);
 app.use('/api/analytics', authenticate, analyticsRoutes);
+app.use('/api/tasks', authenticate, taskRoutes);
 
 
 app.post('/api/chat', authenticate, async (req, res) => {
@@ -85,7 +87,7 @@ app.post('/api/chat', authenticate, async (req, res) => {
         message,
 
       },
-       { timeout: 180000 }
+       { timeout: 300000 }
     );
 
     

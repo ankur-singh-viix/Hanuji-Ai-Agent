@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { MessageSquare, Brain, Zap, Calendar, TrendingUp, Wifi } from 'lucide-react';
-import { analyticsApi, userApi } from '../api';
+import { MessageSquare, Brain, Zap, Calendar, TrendingUp, Wifi, CheckSquare } from 'lucide-react';
+import { analyticsApi, userApi, tasksApi } from '../api';
 import { useStore } from '../store';
 
 export default function Dashboard() {
   const { setProfile, setAnalytics, analytics, profile } = useStore();
   const [conversations, setConversations] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,13 +14,24 @@ export default function Dashboard() {
       analyticsApi.getSummary(),
       userApi.getProfile(),
       userApi.getConversations(10),
-    ]).then(([analyticsRes, profileRes, convoRes]) => {
+      tasksApi.getPending(),
+    ]).then(([analyticsRes, profileRes, convoRes, tasksRes]) => {
       setAnalytics(analyticsRes.data);
       setProfile(profileRes.data);
       setConversations(convoRes.data || []);
+      setTasks(tasksRes.data || []);
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const completeTask = async (id: string) => {
+    try {
+      await tasksApi.complete(id);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const stats = [
     { label: 'Total Messages', value: analytics?.messages?.total || 0,  icon: MessageSquare, color: 'text-brand' },
@@ -55,7 +67,37 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pending Tasks */}
+        <div className="card">
+          <h2 className="font-['Syne'] font-bold text-base mb-4 flex items-center gap-2">
+            <CheckSquare size={14} className="text-brand" />
+            Pending Tasks
+          </h2>
+          <div className="space-y-3 max-h-72 overflow-y-auto">
+            {tasks.map((t) => (
+              <div key={t.id} className="flex gap-3 items-start">
+                <button
+                  onClick={() => completeTask(t.id)}
+                  className="mt-0.5 shrink-0 w-4 h-4 rounded border border-white/20 hover:border-brand hover:bg-brand/10 transition-colors"
+                  title="Mark as done"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-300 truncate">{t.title}</p>
+                  {t.due_at && (
+                    <p className="text-xs text-gray-600">
+                      Due {new Date(t.due_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {tasks.length === 0 && !loading && (
+              <p className="text-sm text-gray-600 text-center py-6">No pending tasks — you're all caught up!</p>
+            )}
+          </div>
+        </div>
+
         {/* Recent Conversations */}
         <div className="card">
           <h2 className="font-['Syne'] font-bold text-base mb-4 flex items-center gap-2">

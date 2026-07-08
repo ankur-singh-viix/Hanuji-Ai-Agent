@@ -1,4 +1,5 @@
 import { calendarTools } from './calendar';
+import { taskTools } from './tasks';
 
 interface Tool {
   name: string;
@@ -31,5 +32,9 @@ export const toolRegistry = new ToolRegistry();
 
 // Register all tools
 for (const tool of calendarTools) {
+  toolRegistry.register(tool);
+}
+
+for (const tool of taskTools) {
   toolRegistry.register(tool);
 }

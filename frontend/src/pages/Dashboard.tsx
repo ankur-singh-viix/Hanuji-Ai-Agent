@@ -37,7 +37,7 @@ export default function Dashboard() {
     { label: 'Total Messages', value: analytics?.messages?.total || 0,  icon: MessageSquare, color: 'text-brand' },
     { label: 'Today',          value: analytics?.messages?.today || 0,  icon: TrendingUp,    color: 'text-green-400' },
     { label: 'Memories',       value: analytics?.memories?.total || 0,  icon: Brain,         color: 'text-purple-400' },
-    { label: 'Tools Used',     value: analytics?.topTools?.length || 0, icon: Zap,           color: 'text-yellow-400' },
+    { label: 'Tools Used', value: analytics?.topTools?.reduce((sum: number, tool: any) => sum + Number(tool.count || 0), 0) || 0, icon: Zap, color: 'text-yellow-400' },
   ];
 
   return (

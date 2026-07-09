@@ -37,7 +37,7 @@ export default function Analytics() {
           { label: 'Total Messages', value: summary?.messages?.total, icon: MessageSquare, color: 'text-brand' },
           { label: 'Today',          value: summary?.messages?.today, icon: TrendingUp,    color: 'text-green-400' },
           { label: 'Memories',       value: summary?.memories?.total, icon: BarChart2,     color: 'text-purple-400' },
-          { label: 'Tools Used',     value: summary?.topTools?.reduce((a: number, t: any) => a + parseInt(t.count), 0), icon: Zap, color: 'text-yellow-400' },
+          { label: 'Tools Used', value: summary?.topTools?.reduce((a: number, t: any) => a + Number(t.count || 0), 0), icon: Zap, color: 'text-yellow-400' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card">
             <div className="flex items-center justify-between mb-2">

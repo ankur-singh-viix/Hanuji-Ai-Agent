@@ -149,10 +149,16 @@ Tool Rules:
 
 Task Rules:
 - Use the create_task tool whenever the user asks to create, add, or remember a task/todo (e.g. "tomorrow finish frontend", "remind me to call mom").
+- A message shaped like "<time word> <verb> <thing>" (e.g. "tomorrow read LLM", "tomorrow finish backend", "next week call the client") is ALWAYS a task creation request — never treat it as just something to "note" or "remember" in a general reply. You must call create_task for these.
+- Examples:
+  - User: "tomorrow read LLM" -> tool_call.name = "create_task", params.title = "Read LLM", params.due_at = tomorrow's date.
+  - User: "tomorrow finish backend" -> tool_call.name = "create_task", params.title = "Finish Backend", params.due_at = tomorrow's date.
+  - User: "remind me to call mom tonight" -> tool_call.name = "create_task", params.title = "Call mom", params.due_at = tonight's date/time.
 - Resolve relative dates like "today", "tomorrow", "next week" using the Current Time below and the user's timezone, and pass an ISO 8601 datetime as due_at.
 - Use list_tasks when the user asks what tasks or todos they have.
 - Use complete_task when the user says a task is done or finished.
 - Do not set needs_confirmation for simple, unambiguous task creation; only ask for confirmation if the task details are unclear.
+- CRITICAL: Never write a reply claiming a task, event, or reminder was created, added, scheduled, noted, or completed unless tool_call.name is actually set to the matching tool (create_task, complete_task, create_calendar_event, etc). If you have not set tool_call.name, do not say the action happened.
 
 Memory Rules:
 - Use remembered user preferences whenever relevant.
@@ -365,18 +371,32 @@ Rules:
 
     /* ───────── GENERAL REPLY ───────── */
 
+    const falseCompletionPattern =
+      /\b(created|added|scheduled|set up|marked|noted)\b[\s\S]{0,40}\b(task|todo|reminder|event|book|reading)\b/i;
+
+    let finalReply = parsed.reply;
+
+    if (!parsed.tool_call?.name && falseCompletionPattern.test(parsed.reply)) {
+      logger.warn(
+        'Blocked a reply that claimed a task/event action without calling a tool',
+        { message }
+      );
+      finalReply =
+        "I want to make sure I actually create that correctly — could you confirm the task title and when it's due (e.g. 'tomorrow at 5pm')?";
+    }
+
     await this.logConversation(
       userId,
       channel,
       message,
-      parsed.reply,
+      finalReply,
       parsed.intent,
       null,
       null
     );
 
     return {
-      reply: parsed.reply,
+      reply: finalReply,
       intent: parsed.intent,
     };
   }
@@ -432,7 +452,7 @@ Rules:
     }
   }
 
-private async formatToolResult(
+  private async formatToolResult(
     originalMessage: string,
     toolName: string,
     result: any,

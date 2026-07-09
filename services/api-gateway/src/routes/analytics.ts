@@ -8,25 +8,25 @@ router.get('/summary', async (req: AuthRequest, res) => {
   try {
     const [messages, tools, memories] = await Promise.all([
       db.query(
-        `SELECT COUNT(*) as total,
+        `SELECT COUNT(*) as count,
                 SUM(CASE WHEN created_at > NOW() - INTERVAL '24h' THEN 1 ELSE 0 END) as today
          FROM conversation_logs WHERE user_id=$1`,
         [req.user?.userId]
       ),
       db.query(
         `SELECT tool_used,
-                COUNT(*) AS total
+                COUNT(*) AS count
          FROM conversation_logs
          WHERE user_id=$1
            AND tool_used IS NOT NULL
          GROUP BY tool_used
-         ORDER BY total DESC
+         ORDER BY count DESC
          LIMIT 5;`,
         [req.user?.userId]
       ),
 
       db.query(
-        `SELECT COUNT(*) as total FROM memory_facts WHERE user_id=$1`,
+        `SELECT COUNT(*) as count FROM memory_facts WHERE user_id=$1`,
         [req.user?.userId]
       ),
     ]);

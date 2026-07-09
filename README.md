@@ -20,7 +20,7 @@ A full-stack personal AI assistant with Telegram, WhatsApp, Google Calendar, mem
 
 ### 1. Clone & Configure
 ```bash
-cp .env.example .env
+cp  .env
 # Fill in your API keys in .env
 ```
 

@@ -19,6 +19,7 @@ import memoryRoutes from './routes/memory';
 import analyticsRoutes from './routes/analytics';
 import { authenticate } from './middleware/auth';
 import taskRoutes from './routes/tasks';
+import { startReminderEngine } from './reminders/reminderEngine';
 
 const app = express();
 const server = createServer(app);
@@ -154,6 +155,7 @@ app.get('/health', async (_req, res) => {
 const PORT = process.env.API_GATEWAY_PORT || 3000;
 server.listen(PORT, () => {
   logger.info(`🐒 API Gateway running on http://localhost:${PORT}`);
+  startReminderEngine(broadcast);
 });
 
 export default app;

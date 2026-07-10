@@ -11,7 +11,7 @@ import { useStore } from './store';
 type Page = 'dashboard' | 'chat' | 'memory' | 'analytics' | 'settings';
 
 export default function App() {
-  const { token, setToken } = useStore();
+  const { token, setToken, userId, addMessage } = useStore();
   const [page, setPage] = useState<Page>('dashboard');
 
   // Auto-login for demo (remove in production — require real auth)
@@ -21,6 +21,36 @@ export default function App() {
       if (saved) setToken(saved);
     }
   }, []);
+
+  // Live reminders: connect once we know who's logged in, and push any
+  // reminder that arrives straight into the chat as an assistant message.
+  useEffect(() => {
+    if (!userId) return;
+
+    const ws = new WebSocket(`ws://localhost:3000/ws?userId=${userId}`);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'reminder') {
+          addMessage({
+            id: data.id || Date.now().toString(),
+            role: 'assistant',
+            content: data.content,
+            timestamp: new Date(),
+          });
+        }
+      } catch (err) {
+        console.error('Failed to parse reminder message', err);
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error('Reminder WebSocket error', err);
+    };
+
+    return () => ws.close();
+  }, [userId]);
 
   if (!token) return <Login />;
 

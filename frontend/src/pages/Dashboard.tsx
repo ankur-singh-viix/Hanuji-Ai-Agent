@@ -75,23 +75,37 @@ export default function Dashboard() {
             Pending Tasks
           </h2>
           <div className="space-y-3 max-h-72 overflow-y-auto">
-            {tasks.map((t) => (
-              <div key={t.id} className="flex gap-3 items-start">
-                <button
-                  onClick={() => completeTask(t.id)}
-                  className="mt-0.5 shrink-0 w-4 h-4 rounded border border-white/20 hover:border-brand hover:bg-brand/10 transition-colors"
-                  title="Mark as done"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-300 truncate">{t.title}</p>
-                  {t.due_at && (
-                    <p className="text-xs text-gray-600">
-                      Due {new Date(t.due_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
+            {tasks.map((t) => {
+              const isOverdue = t.due_at && new Date(t.due_at) < new Date();
+              return (
+                <div key={t.id} className="flex gap-3 items-start">
+                  <button
+                    onClick={() => completeTask(t.id)}
+                    className={`mt-0.5 shrink-0 w-4 h-4 rounded border transition-colors ${
+                      isOverdue
+                        ? 'border-red-500/50 hover:border-red-400 hover:bg-red-500/10'
+                        : 'border-white/20 hover:border-brand hover:bg-brand/10'
+                    }`}
+                    title="Mark as done"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-300 truncate">{t.title}</p>
+                      {isOverdue && (
+                        <span className="badge text-xs shrink-0 border-red-500/30 text-red-400 bg-red-500/10">
+                          Overdue
+                        </span>
+                      )}
+                    </div>
+                    {t.due_at && (
+                      <p className={`text-xs ${isOverdue ? 'text-red-400/80' : 'text-gray-600'}`}>
+                        Due {new Date(t.due_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {tasks.length === 0 && !loading && (
               <p className="text-sm text-gray-600 text-center py-6">No pending tasks — you're all caught up!</p>
             )}

@@ -159,6 +159,7 @@ Task Rules:
 - Use complete_task when the user says a task is done or finished.
 - Do not set needs_confirmation for simple, unambiguous task creation; only ask for confirmation if the task details are unclear.
 - CRITICAL: Never write a reply claiming a task, event, or reminder was created, added, scheduled, noted, or completed unless tool_call.name is actually set to the matching tool (create_task, complete_task, create_calendar_event, etc). If you have not set tool_call.name, do not say the action happened.
+- CRITICAL: Casual acknowledgments like "thanks", "thank you", "ok", "cool", "great", "nice" must NEVER trigger a tool call (tool_call.name must be null). These are just replies to your previous message, not new requests. Only call a tool again if the user is clearly asking for a new action.
 
 Memory Rules:
 - Use remembered user preferences whenever relevant.
@@ -425,7 +426,10 @@ Rules:
 
   private buildFallbackReply(toolName: string, result: any): string {
     switch (toolName) {
-      case 'create_task': {
+     case 'create_task': {
+        if (result?.duplicate) {
+          return `You already have a task for "${result?.title}" — I didn't create a duplicate.`;
+        }
         const due = result?.due_at
           ? ` (due ${new Date(result.due_at).toLocaleString()})`
           : '';

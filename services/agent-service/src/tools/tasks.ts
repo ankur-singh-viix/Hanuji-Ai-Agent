@@ -15,9 +15,32 @@ export const taskTools = [
         recurrence:  { type: 'string', description: 'Optional recurrence rule, e.g. daily, weekly' },
       },
     },
-    handler: async (params: any, profile: any) => {
+handler: async (params: any, profile: any) => {
       const userId = profile?.user_id;
       if (!userId) throw new Error('No user profile found for task creation');
+
+      // Guard against the model accidentally re-firing create_task on an
+      // unrelated later message (e.g. user says "thanks" right after a task
+      // was created, and the model mistakenly repeats the same tool call).
+      const recentDuplicate = await db.query(
+        `SELECT id, title, description, status, due_at, recurrence, created_at
+         FROM tasks
+         WHERE user_id=$1
+           AND status='pending'
+           AND LOWER(title)=LOWER($2)
+           AND created_at > NOW() - INTERVAL '10 minutes'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId, params.title]
+      );
+
+      if (recentDuplicate.rows.length > 0) {
+        logger.info('Skipped duplicate task creation', {
+          id: recentDuplicate.rows[0].id,
+          userId,
+        });
+        return { ...recentDuplicate.rows[0], duplicate: true };
+      }
 
       const result = await db.query(
         `INSERT INTO tasks (user_id, title, description, due_at, recurrence)

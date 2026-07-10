@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import jwt, { Secret } from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { db } from '../lib/db';
 
 const router = Router();
@@ -20,11 +20,11 @@ router.post('/login', async (req, res) => {
     );
 
     const user = result.rows[0];
-    const secret: Secret = process.env.JWT_SECRET || 'default-secret';
+    const secret = process.env.JWT_SECRET || 'default-secret';
     const token = jwt.sign(
       { id: user.id, userId: user.user_id },
-      secret,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      secret as jwt.Secret,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );
 
     res.json({ token, user });

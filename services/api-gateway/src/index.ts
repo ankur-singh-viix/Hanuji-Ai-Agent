@@ -20,6 +20,7 @@ import analyticsRoutes from './routes/analytics';
 import { authenticate } from './middleware/auth';
 import taskRoutes from './routes/tasks';
 import { startReminderEngine } from './reminders/reminderEngine';
+import briefingRoutes from './routes/briefing';
 
 const app = express();
 const server = createServer(app);
@@ -62,6 +63,7 @@ app.use('/api/users', authenticate, userRoutes);
 app.use('/api/memory', authenticate, memoryRoutes);
 app.use('/api/analytics', authenticate, analyticsRoutes);
 app.use('/api/tasks', authenticate, taskRoutes);
+app.use('/api/briefing', authenticate, briefingRoutes);
 
 
 app.post('/api/chat', authenticate, async (req, res) => {

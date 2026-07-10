@@ -50,4 +50,8 @@ export const tasksApi = {
   complete: (id: string) => api.patch(`/api/tasks/${id}/complete`),
 };
 
+export const briefingApi = {
+  get: () => api.get('/api/briefing'),
+};
+
 export default api;

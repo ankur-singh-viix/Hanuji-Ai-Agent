@@ -27,7 +27,7 @@ app.post('/process', async (req, res) => {
     logger.info(`Processing message`, { userId, channel, messageLength: message.length });
 
     // 1. Get context from memory
-    const context = await memory.retrieveContext(userId, message);
+    const context = await memory.retrieveContext(userId, message, channel);
 
     // 2. Run agent
     const result = await agent.process({ userId, channel, message, context });

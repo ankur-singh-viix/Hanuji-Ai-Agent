@@ -39,11 +39,11 @@ Respond ONLY with valid JSON.
 }
 
 export class MemoryManager {
-  async retrieveContext(userId: string, message: string) {
+ async retrieveContext(userId: string, message: string, channel: string = 'web') {
     const [recentHistory, longTermFacts, userProfile] = await Promise.all([
       this.getRecentHistory(userId),
       this.getLongTermFacts(userId),
-      this.getUserProfile(userId),
+      this.getUserProfile(userId, channel),
     ]);
 
     return { recentHistory, longTermFacts, userProfile };
@@ -73,14 +73,41 @@ export class MemoryManager {
     }
   }
 
-  async getUserProfile(userId: string) {
+  async getUserProfile(userId: string, channel: string = 'web') {
     try {
       const result = await db.query(
         'SELECT * FROM user_profiles WHERE user_id=$1',
         [userId]
       );
-      return result.rows[0] || null;
-    } catch {
+
+      if (result.rows[0]) return result.rows[0];
+
+      // No profile yet — this is a first-time contact from a channel that
+      // doesn't go through the web signup flow (e.g. Telegram, WhatsApp).
+      // Auto-create a minimal profile so tools like create_task work
+      // immediately instead of failing with "No user profile found".
+      const created = await db.query(
+        `INSERT INTO user_profiles (user_id, channel)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO NOTHING
+         RETURNING *`,
+        [userId, channel]
+      );
+
+      if (created.rows[0]) {
+        logger.info('Auto-created user profile', { userId, channel });
+        return created.rows[0];
+      }
+
+      // Extremely rare race: another request created it between our SELECT
+      // and INSERT. Just fetch it.
+      const retry = await db.query(
+        'SELECT * FROM user_profiles WHERE user_id=$1',
+        [userId]
+      );
+      return retry.rows[0] || null;
+    } catch (err: any) {
+      logger.error('getUserProfile failed', { userId, channel, err: err.message });
       return null;
     }
   }

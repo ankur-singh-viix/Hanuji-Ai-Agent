@@ -53,7 +53,7 @@ telegramRouter.post('/', async (req, res) => {
       message: text,
       sessionId: `${chatId}`,
       userMeta: { name, telegramId: message.from.id },
-    }, { timeout: 30000 });
+    }, { timeout: 300000 });
 
     const { reply, needsConfirmation, confirmationData } = response.data;
 

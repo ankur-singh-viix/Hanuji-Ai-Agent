@@ -28,7 +28,7 @@ Respond ONLY with valid JSON.
         prompt: fullPrompt,
         stream: false,
       },
-      { timeout: 15000 }
+      { timeout: 150000 }
     );
 
     return response.data.response;

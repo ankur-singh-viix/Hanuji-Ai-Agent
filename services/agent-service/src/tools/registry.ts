@@ -1,5 +1,6 @@
 import { calendarTools } from './calendar';
 import { taskTools } from './tasks';
+import { telegramPersonalTools } from './telegramPersonal';
 
 interface Tool {
   name: string;
@@ -36,5 +37,9 @@ for (const tool of calendarTools) {
 }
 
 for (const tool of taskTools) {
+  toolRegistry.register(tool);
+}
+
+for (const tool of telegramPersonalTools) {
   toolRegistry.register(tool);
 }

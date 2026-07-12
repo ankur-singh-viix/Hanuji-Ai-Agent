@@ -166,6 +166,17 @@ Memory Rules:
 - Store only important long-term facts.
 - Ignore temporary conversation for long-term memory.
 
+Telegram Personal Rules:
+- Use read_telegram_contact when the user asks what someone said, or to summarize/check messages from a specific person on Telegram (e.g. "read Hided X and summarize what he's saying on Telegram").
+- Use send_telegram_message whenever the user asks to send, tell, message, or reply to a specific person on Telegram — even short phrasing like "send it to X" or "tell X ..." counts.
+- Examples:
+  - User: "send hello to Hided X" -> tool_call.name = "send_telegram_message", params.contact = "Hided X", params.message = "hello".
+  - User: "tell Sudhanshu I'll call him tonight" -> tool_call.name = "send_telegram_message", params.contact = "Sudhanshu", params.message = "I'll call him tonight".
+  - User: "hlo Mr send to Hided X" (after being asked what to send) -> tool_call.name = "send_telegram_message", params.contact = "Hided X", params.message = "hlo Mr" (the greeting text itself is the message to send).
+- The tool_call params field for the contact name must always be called "contact" (never "contact_id" or "name").
+- Never call send_telegram_message on your own initiative — only when the user clearly requests it in the current message.
+- If it's genuinely unclear what message text to send, ask the user to clarify rather than guessing — but if the user has already given both a message and a name, send it immediately without asking again.
+
 Current User:
 Name: ${profile?.name || "User"}
 
@@ -426,7 +437,7 @@ Rules:
 
   private buildFallbackReply(toolName: string, result: any): string {
     switch (toolName) {
-     case 'create_task': {
+      case 'create_task': {
         if (result?.duplicate) {
           return `You already have a task for "${result?.title}" — I didn't create a duplicate.`;
         }
@@ -451,6 +462,17 @@ Rules:
           : 'No upcoming events found.';
       case 'delete_calendar_event':
         return `✅ Event removed from your calendar.`;
+      case 'read_telegram_contact': {
+        const msgs = result?.messages || [];
+        if (msgs.length === 0) return `No recent messages found with ${result?.contact}.`;
+        const recap = msgs
+          .slice(-10)
+          .map((m: any) => `${m.fromMe ? 'You' : result?.contact}: ${m.text}`)
+          .join('\n');
+        return `Here's the recent conversation with ${result?.contact}:\n\n${recap}`;
+      }
+      case 'send_telegram_message':
+        return `✅ Sent to ${result?.contact} on Telegram.`;
       default:
         return `✅ Done.`;
     }

@@ -61,7 +61,7 @@ export default function Chat() {
           // channel: 'web',
           message: userMsg.content,
         },
-        { headers: { Authorization: `Bearer ${token}` }, timeout: 300000 }
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 600000 }
       );
 
       const assistantMsg: Message = {

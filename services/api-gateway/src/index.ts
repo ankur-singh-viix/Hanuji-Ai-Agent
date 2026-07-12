@@ -90,7 +90,7 @@ app.post('/api/chat', authenticate, async (req, res) => {
         message,
 
       },
-       { timeout: 300000 }
+       { timeout: 600000 }
     );
 
     
